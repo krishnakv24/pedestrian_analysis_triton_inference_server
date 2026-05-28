@@ -6,10 +6,10 @@ Designed to scale — LLM agent brain (Qwen / LLaMA) can be added alongside via 
 
 ---
 
-## Architecture
+## Repository Structure
 
 ```
-Model_Service/
+pedestrian_analysis_triton_inference_server/
 ├── model_repository/
 │   ├── person_detection/          # YOLOv8n — person detection
 │   │   ├── config.pbtxt
@@ -20,7 +20,7 @@ Model_Service/
 │   └── face_reid/                 # YOLOv8n-face — face re-identification
 │       ├── config.pbtxt
 │       └── 1/model.plan
-├── input/                         # Test input images
+├── input/                         # Sample test images
 ├── output/                        # Inference result images
 ├── Dockerfile                     # Triton server image definition
 ├── docker-compose.yml             # Service orchestration
@@ -39,7 +39,9 @@ Model_Service/
 | `face_detection` | Detect faces per person crop | 3 × 640 × 640 | (batch, 5, 8400) |
 | `face_reid` | Re-identify faces | 3 × 640 × 640 | (batch, 5, 8400) |
 
-**Engine settings:** FP16 precision · Batch size 1–4 · TensorRT 10.3
+> **Engine settings:** FP16 · Batch 1–4 · Input 640×640 · TensorRT 10.3
+> 
+> Model files are named `model.plan` — required naming convention for Triton's TensorRT backend.
 
 ---
 
@@ -49,13 +51,13 @@ Model_Service/
 Input Image
     │
     ▼
-[Person Detection]  ── YOLOv8n      →  person bounding boxes
+[Person Detection]  ── YOLOv8n       →  person bounding boxes
     │
-    ▼ (crop each person)
-[Face Detection]    ── YOLOv8l-face →  face bounding boxes
+    ▼  (crop each person region)
+[Face Detection]    ── YOLOv8l-face  →  face bounding boxes
     │
-    ▼ (crop each face)
-[Face ReID]         ── YOLOv8n-face →  face identity features
+    ▼  (crop each face region)
+[Face ReID]         ── YOLOv8n-face  →  face identity features
     │
     ▼
 Annotated Output Image
@@ -67,7 +69,8 @@ Annotated Output Image
 
 - NVIDIA GPU (tested: RTX 4050 6GB)
 - CUDA driver 12.x
-- Docker with NVIDIA Container Toolkit
+- Docker
+- NVIDIA Container Toolkit
 
 ### Install NVIDIA Container Toolkit
 
@@ -82,20 +85,38 @@ sudo systemctl restart docker
 
 ---
 
-## Setup
+## Build the Docker Image
 
-### Option A — Build from Dockerfile
+### Step 1 — Clone the repository
 
 ```bash
 git clone https://github.com/krishnakv24/pedestrian_analysis_triton_inference_server.git
 cd pedestrian_analysis_triton_inference_server
+```
+
+### Step 2 — Build the image
+
+```bash
 docker build -t triton-service:latest .
 ```
 
-### Option B — Load from pre-built tar
+**What the Dockerfile does:**
+- Starts from `nvcr.io/nvidia/tritonserver:24.08-py3` (NVIDIA official Triton image)
+- Installs `tritonclient[grpc]` and `numpy` for the gRPC client
+- Exposes ports `8001` (gRPC) and `8002` (metrics)
+- Sets `tritonserver` as the default command with the model repository mounted at `/models`
+
+### Step 3 — Verify the image
 
 ```bash
-docker load -i triton-service.tar
+docker images triton-service
+```
+
+Expected:
+
+```
+REPOSITORY       TAG       IMAGE ID       CREATED        SIZE
+triton-service   latest    xxxxxxxxxxxx   X minutes ago  ~9GB
 ```
 
 ---
@@ -103,10 +124,11 @@ docker load -i triton-service.tar
 ## Start the Service
 
 ```bash
+cd pedestrian_analysis_triton_inference_server
 docker compose up -d
 ```
 
-Verify all models are loaded:
+Check all models loaded successfully:
 
 ```bash
 docker logs triton_vision
@@ -118,13 +140,15 @@ Expected:
 successfully loaded 'person_detection'
 successfully loaded 'face_detection'
 successfully loaded 'face_reid'
+Started GRPCInferenceService at 0.0.0.0:8001
+Started Metrics Service at 0.0.0.0:8002
 ```
 
 ---
 
 ## Host Machine Setup
 
-Install Python dependencies on the host machine:
+Install Python dependencies on the client machine:
 
 ```bash
 pip install -r host_machine_requirements.txt
@@ -134,7 +158,7 @@ pip install -r host_machine_requirements.txt
 
 ## Run the Pipeline Test
 
-Place input images (`.png` / `.jpg`) inside the `input/` folder, then:
+Place input images (`.png` / `.jpg`) in the `input/` folder, then:
 
 ```bash
 python3 test_client.py
@@ -165,14 +189,14 @@ python3 test_client.py
 ============================================================
 ```
 
-Annotated output images are saved to the `output/` folder with:
+Annotated output images are saved to `output/` with:
 - **Green boxes** — detected persons
 - **Red boxes** — detected faces
 - **Purple labels** — face IDs (ID-0, ID-1 ...)
 
 ---
 
-## gRPC Endpoint
+## gRPC Endpoints
 
 | Port | Protocol | Purpose |
 |---|---|---|
@@ -194,7 +218,7 @@ out = grpcclient.InferRequestedOutput("output0")
 
 # Choose: person_detection | face_detection | face_reid
 result = client.infer(model_name="person_detection", inputs=[inp], outputs=[out])
-detections = result.as_numpy("output0")  # (1, 84, 8400)
+detections = result.as_numpy("output0")  # shape: (1, 84, 8400)
 ```
 
 ---
