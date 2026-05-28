@@ -1,0 +1,1 @@
+model_repository/face_detection/1/model.plan filter=lfs diff=lfs merge=lfs -text
