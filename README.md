@@ -87,8 +87,8 @@ sudo systemctl restart docker
 ### Option A — Build from Dockerfile
 
 ```bash
-git clone https://github.com/krishnakv24/pedestrian_analysis_cv_models.git
-cd pedestrian_analysis_cv_models/Model_Service
+git clone https://github.com/krishnakv24/pedestrian_analysis_triton_inference_server.git
+cd pedestrian_analysis_triton_inference_server
 docker build -t triton-service:latest .
 ```
 
