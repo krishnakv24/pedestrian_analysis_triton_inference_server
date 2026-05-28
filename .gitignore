@@ -1,0 +1,5 @@
+# Docker tar
+*.tar
+
+# Output images (generated at runtime)
+output/

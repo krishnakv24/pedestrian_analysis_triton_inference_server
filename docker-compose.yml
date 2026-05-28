@@ -1,0 +1,52 @@
+services:
+
+  # ── Vision Models (YOLOv8 TensorRT via Triton) ──────────────────────────────
+  triton:
+    image: nvcr.io/nvidia/tritonserver:24.08-py3
+    container_name: triton_vision
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8001:8001"   # gRPC
+      - "8002:8002"   # Metrics (Prometheus)
+    volumes:
+      - ./model_repository:/models
+    command: >
+      tritonserver
+      --model-repository=/models
+      --grpc-port=8001
+      --allow-http=false
+      --allow-grpc=true
+      --allow-metrics=true
+      --metrics-port=8002
+      --log-verbose=1
+
+  # ── LLM Agent Brain (Qwen / LLaMA via vLLM) ─────────────────────────────────
+  # Uncomment and configure when ready to deploy LLM
+  #
+  # vllm:
+  #   image: vllm/vllm-openai:latest
+  #   container_name: vllm_brain
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  #   ports:
+  #     - "8000:8000"   # OpenAI-compatible HTTP API
+  #   volumes:
+  #     - ./llm_models:/models
+  #   command: >
+  #     --model /models/qwen  (or /models/llama)
+  #     --dtype bfloat16
+  #     --tensor-parallel-size 1
+  #     --served-model-name brain

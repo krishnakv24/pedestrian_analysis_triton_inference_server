@@ -1,0 +1,12 @@
+# Host Machine Requirements
+# Install with: pip install -r host_machine_requirements.txt
+
+# Triton gRPC client
+tritonclient[grpc]==2.68.0
+
+# Image processing
+opencv-python-headless==4.13.0.92
+numpy==2.4.6
+
+# GPU monitoring
+nvidia-ml-py==13.595.45
